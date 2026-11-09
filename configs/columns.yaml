@@ -1,0 +1,81 @@
+# Column mapping for the raw Tallinn AIS dataset (Kaggle gaborvisky/ais-dataset).
+# Filled in Milestone 1 (2026-11-07) from data/raw/tallinn/2022-09-08.csv.
+#
+# Each daily file is tab-separated, one decoded AIS message per line, 113 named columns
+# (data rows carry a trailing tab -> read with index_col=False). Position reports and
+# voyage data arrive as different message types and are joined per MMSI in src/load.py.
+raw_glob: "*.csv.gz"
+read:
+  sep: "\t"
+  index_col: false
+
+message_types:
+  position: [1, 2, 3]   # Class A position report
+  voyage: [5]           # Class A static & voyage data (destination, ETA, draught, dimensions)
+  # Class B (18, 19, 24) carries no destination/ETA and is not used.
+
+# canonical name -> raw column, for position messages
+position_columns:
+  timestamp: date         # receiver time, "%Y-%m-%d %H:%M:%S.%f", UTC assumed
+  mmsi: mmsi
+  lat: lat                # 91 = not available
+  lon: lon                # 181 = not available
+  sog: speed              # knots; 102.3 = not available
+  cog: course             # degrees; 360 = not available
+  heading: heading        # 511 = not available
+  nav_status: status      # e.g. "NavigationStatus.Moored"
+
+# canonical name -> raw column, for voyage messages
+voyage_columns:
+  timestamp: date
+  mmsi: mmsi
+  imo: imo
+  vessel_type: ship_type  # e.g. "ShipType.Cargo_HazardousCategory_A"
+  destination: destination  # free text typed by the crew
+  draught: draught        # metres
+  eta_month: month        # crew ETA, no year; 0 = not available
+  eta_day: day            # 0 = not available
+  eta_hour: hour          # 24 = not available
+  eta_minute: minute      # 60 = not available
+  to_bow: to_bow          # length = to_bow + to_stern
+  to_stern: to_stern
+  to_port: to_port        # width = to_port + to_starboard
+  to_starboard: to_starboard
+
+join:
+  # each position gets the most recent earlier voyage message of the same vessel
+  max_voyage_age_hours: 24
+
+formats:
+  timestamp: ISO8601
+  timezone: UTC
+  eta_has_year: false
+
+nav_status_values:
+  at_anchor: [NavigationStatus.AtAnchor]
+  moored: [NavigationStatus.Moored]
+
+# Milestone 1 answers to the SPEC open questions (one day sampled: 2022-09-08)
+findings:
+  dataset: "gaborvisky/ais-dataset: 181 daily files, 2022-09-08 .. 2023-03-07, 20.4 GB unzipped"
+  coverage: "one receiver near Tallinn; 5-95% of positions in lat 59.45-59.79, lon 24.27-24.92"
+  rows_per_day: "~426k messages; ~267k Class A positions from ~160 vessels; ~21k voyage messages from ~150 vessels"
+  eta_format: "month/day/hour/minute without year (AIS message 5); n/a sentinels 0/0/24/60 in ~5-7% of voyage messages"
+  timezone: "UTC assumed (AIS ETA is defined in UTC; receiver timestamps carry no zone)"
+  has_actual_arrival: >-
+    No column, but derivable: of 42 vessels whose destination names a Tallinn port on
+    2022-09-08, 37 were later seen moored or stopped (SOG < 0.5) in range.
+  stale_eta: >-
+    48% of voyage messages carry an ETA already in the past (median eta - timestamp = +1.2 h,
+    5th pct -66 days). The SPEC year-rollover rule would turn these into ETAs ~1 year ahead,
+    which the 720 h cap then drops; Milestone 2 should roll over only ETAs far in the past
+    (e.g. > 180 days) so stale ETAs are counted by the "ETA passed" rule instead.
+  destination: >-
+    Free text: UN/LOCODEs ("EETLL", "EE TLL", "FIKTK"), names ("TALLINN", "MUUGA", "SAINT PETERSBURG"),
+    routes ("EEVAN<>FIHEL", "RU ULU > IN VAD"), and junk ("HOME"). Needs a lookup to coordinates
+    (dest_lat/dest_lon do not exist) — decide in Milestone 2.
+  quirks:
+    - "56% of Class A positions have SOG < 0.5 kn; 1.0% have SOG = 102.3 (n/a)"
+    - "Heading = 511 (n/a) in 22% of positions; COG = 360 (n/a) in 4.9%"
+    - "Some positions at lat 91 / lon 181 (n/a) or 0"
+    - "~1k messages per day have a decode error and are skipped"

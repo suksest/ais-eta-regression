@@ -1,0 +1,43 @@
+# Cleaning thresholds (SPEC "Data cleaning and validation"). Starting values;
+# adjust after EDA and record the reason in the `changelog` below.
+coordinates:
+  lat_range: [-90, 90]
+  lon_range: [-180, 180]
+  drop_zero_position: true
+  drop_zero_destination: true
+
+sog:
+  valid_range_kn: [0, 40]     # 102.3 kn = not available in AIS
+  min_moving_kn: 0.5
+
+nav_status:
+  drop: [at_anchor, moored]   # keys into columns.yaml nav_status_values
+
+target:
+  min_hours: 0                # exclusive: time_to_arrival_h > 0
+  max_hours: 720              # 30 days
+
+implied_speed:
+  range_kn: [0.5, 40]         # distance_nm / time_to_arrival_h
+
+duplicates:
+  subset: [mmsi, timestamp]
+
+eta:
+  # The crew ETA has no year. Take the year from the timestamp; add one year only when the
+  # result is this far in the past (a real Dec -> Jan rollover). Smaller negatives are stale
+  # ETAs and are dropped by the positive-target rule instead.
+  rollover_if_past_days: 180
+
+arrival:
+  # Observed arrival = first ping of a stop (SOG < stop_sog_kn or status moored) lasting at
+  # least min_stop_minutes, directly after a moving stretch. A track gap longer than
+  # max_gap_minutes ends a stretch (vessel out of receiver range).
+  stop_sog_kn: 0.5
+  min_stop_minutes: 30
+  max_gap_minutes: 60
+
+changelog: []
+#  - date: YYYY-MM-DD
+#    change: "max_hours 720 -> 480"
+#    reason: "..."

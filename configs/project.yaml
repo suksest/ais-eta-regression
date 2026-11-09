@@ -1,0 +1,34 @@
+# Project-wide settings: paths, seed, split and evaluation parameters.
+seed: 42
+
+# Raw AIS messages around Tallinn, 2022-09-08 .. 2023-03-07, one CSV per day (181 days).
+# Replaced satyamrajput7913/ais-ship-tracking-vessel-dynamics-and-eta-data, whose
+# ETA_hours was distance/speed (see docs/dataset_decision.md).
+kaggle_dataset: gaborvisky/ais-dataset
+
+download:
+  days: [2022-09-08]   # start with one day; widen after Milestone 1
+
+paths:
+  raw_dir: data/raw/tallinn
+  processed_dir: data/processed
+  loaded: data/processed/loaded      # one parquet per day
+  clean: data/processed/clean.parquet
+  features: data/processed/features.parquet
+  splits: data/processed/splits.parquet   # MMSI -> train/val/test
+  models_dir: models
+  figures_dir: reports/figures
+  report: reports/report.md
+
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+  cv_folds: 5
+
+features:
+  rare_type_min_count: 500      # vessel types with fewer rows are merged into "Other"
+
+evaluation:
+  distance_bands_nm: [0, 50, 200, 1000, .inf]
+  top_errors: 5
